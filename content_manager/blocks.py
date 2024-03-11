@@ -1,25 +1,39 @@
+from django.conf import settings
+from django.utils.translation import gettext_lazy as _
+from dsfr.constants import COLOR_CHOICES
 from wagtail import blocks
 from wagtail.documents.blocks import DocumentChooserBlock
 from wagtail.images.blocks import ImageChooserBlock
+from wagtailmarkdown.blocks import MarkdownBlock
+
+from content_manager.constants import HEADING_CHOICES, LEVEL_CHOICES
 
 
 # Wagtail Block Documentation : https://docs.wagtail.org/en/stable/reference/streamfield/blocks.html
 
-HEADING_CHOICES = [
-    ("h2", "En-tête 2"),
-    ("h3", "En-tête 3"),
-    ("h4", "En-tête 4"),
-    ("h5", "En-tête 5"),
-    ("h6", "En-tête 6"),
-    ("p", "Paragraphe"),
-]
 
-LEVEL_CHOICES = [
-    ("error", "Erreur"),
-    ("success", "Succès"),
-    ("info", "Information"),
-    ("warning", "Attention"),
-]
+## Meta blocks
+class BackgroundColorChoiceBlock(blocks.ChoiceBlock):
+    choices = COLOR_CHOICES
+
+    class Meta:
+        icon = "view"
+
+
+class LinkStructValue(blocks.StructValue):
+    def url(self):
+        external_url = self.get("external_url")
+        page = self.get("page")
+        return external_url or page.url
+
+
+class LinkBlock(blocks.StructBlock):
+    text = blocks.CharBlock(label=_("Link text"), required=False)
+    page = blocks.PageChooserBlock(label=_("Page"), required=False)
+    external_url = blocks.URLBlock(label=_("External URL"), required=False)
+
+    class Meta:
+        value_class = LinkStructValue
 
 
 ## Basic blocks
@@ -93,22 +107,6 @@ class CardBlock(blocks.StructBlock):
     )
 
 
-class HeroBlock(blocks.StructBlock):
-    bg_image = ImageChooserBlock(label="Image d’arrière plan")
-    bg_color = blocks.RegexBlock(
-        label="Couleur d’arrière plan au format hexa (Ex: #f5f5fe)",
-        regex=r"^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$",
-        error_messages={"invalid": "La couleur n’est pas correcte, le format doit être #fff ou #f5f5fe"},
-        required=False,
-    )
-    title = blocks.CharBlock(label="Titre")
-    text = blocks.CharBlock(label="Texte", required=False)
-    cta_label = blocks.CharBlock(label="Texte du bouton", required=False)
-    cta_link = blocks.URLBlock(label="Lien du bouton", required=False)
-    large = blocks.BooleanBlock(label="Large", required=False)
-    darken = blocks.BooleanBlock(label="Assombrir", required=False)
-
-
 class IframeBlock(blocks.StructBlock):
     title = blocks.CharBlock(
         label="Titre",
@@ -122,7 +120,15 @@ class IframeBlock(blocks.StructBlock):
 
 
 class ImageAndTextBlock(blocks.StructBlock):
-    image = ImageChooserBlock(label="Illustration (à gauche)")
+    image = ImageChooserBlock(label="Illustration")
+    image_side = blocks.ChoiceBlock(
+        label="Côté où afficher l’image",
+        choices=[
+            ("left", "Gauche"),
+            ("right", "Droite"),
+        ],
+        default="right",
+    )
     image_ratio = blocks.ChoiceBlock(
         label="Largeur de l’image",
         choices=[
@@ -130,14 +136,17 @@ class ImageAndTextBlock(blocks.StructBlock):
             ("5", "5/12"),
             ("6", "6/12"),
         ],
+        default="3",
     )
-    text = blocks.RichTextBlock(label="Texte avec mise en forme (à droite)")
+    text = blocks.RichTextBlock(label="Texte avec mise en forme")
+    link = LinkBlock(required=False)
     link_label = blocks.CharBlock(
         label="Titre du lien",
         help_text="Le lien apparait en bas du bloc de droite, avec une flèche",
         required=False,
     )
-    link_url = blocks.URLBlock(label="Lien", required=False)
+    page = blocks.PageChooserBlock(label="Lien interne", required=False)
+    link_url = blocks.URLBlock(label="Lien externe", required=False)
 
 
 class ImageBlock(blocks.StructBlock):
@@ -186,11 +195,6 @@ class TextAndCTA(blocks.StructBlock):
     cta_url = blocks.CharBlock(label="Lien", required=False)
 
 
-class TitleBlock(blocks.StructBlock):
-    title = blocks.CharBlock(label="Titre")
-    large = blocks.BooleanBlock(label="Large", required=False)
-
-
 class VideoBlock(blocks.StructBlock):
     title = blocks.CharBlock(label="Titre", required=False)
     caption = blocks.CharBlock(label="Légende")
@@ -213,11 +217,52 @@ class MultiColumnsBlock(blocks.StreamBlock):
 
 class MultiColumnsWithTitleBlock(blocks.StructBlock):
     bg_image = ImageChooserBlock(label="Image d’arrière plan", required=False)
+    bg_color_class = BackgroundColorChoiceBlock(
+        label="Couleur d’arrière-plan",
+        required=False,
+        help_text="Utilise les couleurs du système de design de l’État",
+    )
     bg_color = blocks.RegexBlock(
-        label="Couleur d’arrière plan au format hexa (Ex: #f5f5fe)",
+        label="Couleur d’arrière-plan au format hexa (Ex: #f5f5fe)",
         regex=r"^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$",
+        help_text="(Obsolète, sera retiré dans une future mise à jour. Remplacez-le par la couleur d’arrière-plan)",
         error_messages={"invalid": "La couleur n’est pas correcte, le format doit être #fff ou #f5f5fe"},
         required=False,
     )
     title = blocks.CharBlock(label="Titre", required=False)
     columns = MultiColumnsBlock(label="Multi-colonnes")
+
+
+STREAMFIELD_COMMON_BLOCKS = [
+    ("paragraph", blocks.RichTextBlock(label="Texte avec mise en forme")),
+    ("image", ImageBlock()),
+    (
+        "imageandtext",
+        ImageAndTextBlock(label="Bloc image et texte"),
+    ),
+    ("alert", AlertBlock(label="Message d’alerte")),
+    ("callout", CalloutBlock(label="Texte mise en avant")),
+    ("quote", QuoteBlock(label="Citation")),
+    ("video", VideoBlock(label="Vidéo")),
+    ("multicolumns", MultiColumnsWithTitleBlock(label="Multi-colonnes")),
+    ("accordions", AccordionsBlock(label="Accordéons")),
+    ("stepper", StepperBlock(label="Étapes")),
+    ("separator", SeparatorBlock(label="Séparateur")),
+    ("markdown", MarkdownBlock()),
+]
+
+
+# See warning on https://docs.wagtail.org/en/latest/reference/streamfield/blocks.html#wagtail.blocks.RawHTMLBlock
+# There is currently no way to restrict a type of block depending on user permissions,
+# pending issue https://github.com/wagtail/wagtail/issues/6323
+if settings.SF_ALLOW_RAW_HTML_BLOCKS is True:
+    STREAMFIELD_COMMON_BLOCKS += [
+        (
+            "html",
+            blocks.RawHTMLBlock(
+                readonly=True,
+                help_text="""Avertissement : Utilisez le bloc HTML avec précaution.
+                Un code malveillant peut compromettre la sécurité du site.""",
+            ),
+        )
+    ]

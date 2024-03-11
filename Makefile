@@ -22,6 +22,11 @@ test-unit:
 collectstatic:
 	$(EXEC_CMD) poetry run python manage.py collectstatic --noinput --ignore=*.sass
 
+
+.PHONY: messages
+messages:
+	$(EXEC_CMD) poetry run django-admin makemessages -l fr --ignore=manage.py
+
 .PHONY: sass
 sass:
 	$(EXEC_CMD) poetry run python manage.py compilescss
@@ -45,6 +50,7 @@ init:
 	$(EXEC_CMD) poetry run pre-commit install
 	$(EXEC_CMD) poetry run python manage.py migrate
 	make collectstatic
+	$(EXEC_CMD) poetry run python manage.py set_config
 	$(EXEC_CMD) poetry run python manage.py create_sample_pages
 
 .PHONY: runserver

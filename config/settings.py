@@ -51,8 +51,10 @@ INSTALLED_APPS = [
     "wagtail.images",
     "wagtail.admin",
     "wagtail.search",
+    "wagtail.snippets",
     "wagtail",
     "wagtail_modeladmin",
+    "wagtailmarkdown",
     "wagtailmenus",
     "taggit",
     "django.contrib.auth",
@@ -64,6 +66,7 @@ INSTALLED_APPS = [
     "dsfr",
     "sass_processor",
     "content_manager",
+    "blog",
 ]
 
 if DEBUG:
@@ -101,6 +104,7 @@ TEMPLATES = [
                 "django.contrib.messages.context_processors.messages",
                 "wagtail.contrib.settings.context_processors.settings",
                 "wagtailmenus.context_processors.wagtailmenus",
+                "content_manager.context_processors.skiplinks",
             ],
         },
     },
@@ -113,13 +117,16 @@ WSGI_APPLICATION = "config.wsgi.application"
 # https://docs.djangoproject.com/en/4.1/ref/settings/#databases
 
 DATABASE_URL = os.getenv("DATABASE_URL")
-DATABASES = {
-    "default": dj_database_url.parse(
-        DATABASE_URL,
-        conn_max_age=600,
-        conn_health_checks=True,
-    )
-}
+if DATABASE_URL:
+    DATABASES = {
+        "default": dj_database_url.parse(
+            DATABASE_URL,
+            conn_max_age=600,
+            conn_health_checks=True,
+        )
+    }
+else:
+    raise ValueError("Please set the DATABASE_URL environment variable")
 
 # Password validation
 # https://docs.djangoproject.com/en/4.1/ref/settings/#auth-password-validators
@@ -145,7 +152,7 @@ WAGTAIL_PASSWORD_RESET_ENABLED = os.getenv("WAGTAIL_PASSWORD_RESET_ENABLED", Fal
 # Internationalization
 # https://docs.djangoproject.com/en/3.2/topics/i18n/
 
-LANGUAGE_CODE = "fr-FR"
+LANGUAGE_CODE = "fr"
 
 TIME_ZONE = "Europe/Paris"
 
@@ -157,8 +164,11 @@ USE_TZ = True
 
 
 # Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/3.2/howto/static-files/
-# https://whitenoise.evans.io/en/latest/
+# https://docs.djangoproject.com/en/5.0/howto/static-files/
+STORAGES = {}
+STORAGES["staticfiles"] = {
+    "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+}
 
 STATICFILES_FINDERS = [
     "django.contrib.staticfiles.finders.FileSystemFinder",
@@ -167,20 +177,29 @@ STATICFILES_FINDERS = [
 ]
 
 # S3 uploads & MEDIA CONFIGURATION
-# ------------------------------------------------------------------------------
+# https://django-storages.readthedocs.io/en/latest/backends/amazon-S3.html
 
 if os.getenv("S3_HOST"):
-    AWS_S3_ACCESS_KEY_ID = os.getenv("S3_KEY_ID", "123")
-    AWS_S3_SECRET_ACCESS_KEY = os.getenv("S3_KEY_SECRET", "secret")
-    AWS_S3_ENDPOINT_URL = f"{os.getenv('S3_PROTOCOL', 'https')}://{os.getenv('S3_HOST')}"
-    AWS_STORAGE_BUCKET_NAME = os.getenv("S3_BUCKET_NAME", "set-bucket-name")
-    AWS_S3_STORAGE_BUCKET_REGION = os.getenv("S3_BUCKET_REGION", "fr")
-    AWS_S3_FILE_OVERWRITE = False
-    DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
-    MEDIA_URL = f"{AWS_S3_ENDPOINT_URL}/"
-    AWS_LOCATION = os.getenv("S3_LOCATION", "")
+    endpoint_url = f"{os.getenv('S3_PROTOCOL', 'https')}://{os.getenv('S3_HOST')}"
+
+    STORAGES["default"] = {
+        "BACKEND": "storages.backends.s3.S3Storage",
+        "OPTIONS": {
+            "bucket_name": os.getenv("S3_BUCKET_NAME", "set-bucket-name"),
+            "access_key": os.getenv("S3_KEY_ID", "123"),
+            "secret_key": os.getenv("S3_KEY_SECRET", "secret"),
+            "endpoint_url": endpoint_url,
+            "region_name": os.getenv("S3_BUCKET_REGION", "fr"),
+            "file_overwrite": False,
+            "location": os.getenv("S3_LOCATION", ""),
+        },
+    }
+
+    MEDIA_URL = f"{endpoint_url}/"
 else:
-    DEFAULT_FILE_STORAGE = "django.core.files.storage.FileSystemStorage"
+    STORAGES["default"] = {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    }
     MEDIA_URL = "medias/"
     MEDIA_ROOT = os.path.join(BASE_DIR, os.getenv("MEDIA_ROOT", ""))
 
@@ -206,6 +225,10 @@ WAGTAIL_SITE_NAME = os.getenv("SITE_NAME", "Gestionnaire de contenu avec le Syst
 # Base URL to use when referring to full URLs within the Wagtail admin backend -
 # e.g. in notification emails. Don't include '/admin' or a trailing slash
 WAGTAILADMIN_BASE_URL = f"{os.getenv('HOST_PROTO', 'https')}://{os.getenv('HOST_URL', 'localhost')}"
+
+HOST_PORT = os.getenv("HOST_PORT", "")
+if HOST_PORT != "":
+    WAGTAILADMIN_BASE_URL = f"{WAGTAILADMIN_BASE_URL}:{HOST_PORT}"
 
 # Disable Gravatar service
 WAGTAIL_GRAVATAR_PROVIDER_URL = None
@@ -234,3 +257,5 @@ WAGTAILIMAGES_EXTENSIONS = ["gif", "jpg", "jpeg", "png", "webp", "svg"]
 CSRF_TRUSTED_ORIGINS = []
 for host in ALLOWED_HOSTS:
     CSRF_TRUSTED_ORIGINS.append("https://" + host)
+
+SF_ALLOW_RAW_HTML_BLOCKS = os.getenv("SF_ALLOW_RAW_HTML_BLOCKS", "False").lower() == "true"

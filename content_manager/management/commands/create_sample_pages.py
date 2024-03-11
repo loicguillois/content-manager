@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.urls import reverse
 from wagtail.models import Page, Site
@@ -28,7 +29,7 @@ class Command(BaseCommand):
                 self.create_homepage()
             elif slug == "mentions-legales":
                 title = "Mentions légales"
-                body = [("title", {"title": title, "large": True})]
+                body = []
 
                 alert_block = {
                     "title": title,
@@ -36,6 +37,7 @@ class Command(BaseCommand):
                     <a href="https://www.francenum.gouv.fr/guides-et-conseils/developpement-commercial/site-web/quelles-sont-les-mentions-legales-pour-un-site">
                     Que doivent-elles obligatoirement contenir ?</a>""",  # noqa
                     "level": "info",
+                    "heading_tag": "h2",
                 }
                 body.append(("alert", alert_block))
 
@@ -50,12 +52,12 @@ class Command(BaseCommand):
                 </ul>
                 <p>Ces deux derniers peuvent pointer vers des pages à part entière ou des sections de cette page.</p>
                 """  # noqa
-                body.append(("paragraphlarge", RichText(text_raw)))
+                body.append(("paragraph", RichText(text_raw)))
 
                 self.create_page(slug=slug, title=title, body=body)
             elif slug == "accessibilite":
                 title = "Déclaration d’accessibilité"
-                body = [("title", {"title": title, "large": True})]
+                body = []
 
                 alert_block = {
                     "title": title,
@@ -63,6 +65,7 @@ class Command(BaseCommand):
                     <a href="https://betagouv.github.io/a11y-generateur-declaration/#create">
                     Générateur de déclaration d’accessibilité</a>""",
                     "level": "info",
+                    "heading_tag": "h2",
                 }
 
                 body.append(("alert", alert_block))
@@ -80,7 +83,8 @@ class Command(BaseCommand):
             raise ValueError(f"The home page seem to already exist with id {already_exists.id}")
 
         # Create the page
-        body = [("title", {"title": "Votre nouveau site avec le CMS Beta", "large": True})]
+        body = []
+        title = "Votre nouveau site avec Sites faciles"
 
         image = import_image(
             full_path="staticfiles/dsfr/dist/artwork/pictograms/digital/coding.svg",
@@ -94,11 +98,13 @@ class Command(BaseCommand):
         <p>Vous pouvez maintenant vous connecter dans l’administration et personnaliser le site.</p>
         """
 
+        admin_url = f"{settings.WAGTAILADMIN_BASE_URL}{reverse('wagtailadmin_home')}"
+
         image_and_text_block = {
             "image": image,
             "image_ratio": "3",
             "text": RichText(text_raw),
-            "link_url": reverse("wagtailadmin_home"),
+            "link_url": admin_url,
             "link_label": "Gérer le site",
         }
 
@@ -112,10 +118,10 @@ class Command(BaseCommand):
             <li>Remplacer le contenu de cette page d’accueil.</li>
         </ul>
         """
-        body.append(("paragraphlarge", RichText(text_2_raw)))
+        body.append(("paragraph", RichText(text_2_raw)))
 
         root = Page.objects.get(slug="root")
-        home_page = root.add_child(instance=ContentPage(title="Accueil", body=body, show_in_menus=True))
+        home_page = root.add_child(instance=ContentPage(title=title, body=body, show_in_menus=True))
 
         # Define it as default for the default site
         site = Site.objects.filter(is_default_site=True).first()
