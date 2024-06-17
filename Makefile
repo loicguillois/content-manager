@@ -25,7 +25,7 @@ collectstatic:
 
 .PHONY: messages
 messages:
-	$(EXEC_CMD) poetry run django-admin makemessages -l fr --ignore=manage.py
+	$(EXEC_CMD) poetry run django-admin makemessages -l fr --ignore=manage.py --ignore=config --ignore=medias --ignore=__init__.py --ignore=setup.py --ignore=staticfiles
 
 .PHONY: sass
 sass:
@@ -51,8 +51,19 @@ init:
 	$(EXEC_CMD) poetry run python manage.py migrate
 	make collectstatic
 	$(EXEC_CMD) poetry run python manage.py set_config
-	$(EXEC_CMD) poetry run python manage.py create_sample_pages
+	$(EXEC_CMD) poetry run python manage.py import_dsfr_pictograms
+	$(EXEC_CMD) poetry run python manage.py create_starter_pages
+
+.PHONY: demo
+demo:
+	make init
+	$(EXEC_CMD) poetry run python manage.py create_demo_pages
 
 .PHONY: runserver
 runserver:
 	$(EXEC_CMD) poetry run python manage.py runserver $(HOST_URL):$(HOST_PORT)
+
+
+.PHONY: test
+test:
+	$(EXEC_CMD) poetry run python manage.py test
